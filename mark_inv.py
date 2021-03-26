@@ -20,40 +20,25 @@ def connect():
 	    return row
     except Error as e:
         print(e)
-
     finally:
 	conn.close()
 
 def create_items():
 	for item in SQL_output:
 		acc = "{0}_{1}".format(item[0],item[1])
-		command = 'zabbix_sender -z {0}  -s {1} -k host.finder -o \'{{"data":[{{"{{#NR}}":"{2}"}}]}}\''.format(ZabS,HOST,acc)
-	        pipe = os.popen(command)
-		print(command)
+	        pipe = os.popen('zabbix_sender -z {0}  -s {1} -k host.finder -o \'{{"data":[{{"{{#NR}}":"{2}"}}]}}\''.format(ZabS,HOST,acc))
 		time.sleep(1)
 
 def ping(item):
-	command = 'ping -c 10 {0}'.format(item[1])
-	print(command)
-	pipe = os.popen(command)
+	pipe = os.popen('ping -c 10 {0}'.format(item[1]))
 
 def avail_check(item):
-	command = ['ping', '-c', '1', item[1]]
-	print(command)
-	ping_output = subprocess.call(command)
-	print(ping_output)
+	ping_output = subprocess.call(['ping', '-c', '1', item[1]])
 	return ping_output
 
 def tcpdump(item):
-        command = '/sbin/tcpdump -i any -s0 -v -c 1 src {0}'.format(item[1])
-        print(command)
-        pipe = os.popen(command)
-	output = pipe.read()
-	output = output.split('(')
-        output = output[1]
-	output = output.split(',')
-	output = output[0]
-	print(output)
+	output = os.popen('/sbin/tcpdump -i any -s0 -v -c 1 src {0}'.format(item[1])).read()
+	output = output.split('(')[1].split(',')[0]
 	return output
 
 class ThreadWithReturnValue(Thread):
@@ -71,31 +56,23 @@ def main():
 	try:
 		for item in SQL_output:
 			acc = "{0}_{1}".format(item[0],item[1])
-                        print(acc)
 			ping_output = avail_check(item)
                         if ping_output == 0:
 				thread1 = Thread(target=ping, args=(item,))
 				thread2 = ThreadWithReturnValue(target=tcpdump, args=(item,))
-
 				thread1.start()
 				thread2.start()
 				thread1.join()
 				time.sleep(1)
 				output = thread2.join()
-
-				print(output)
-				command = 'zabbix_sender -z {0} -s {1} -k \'host_[{2}]\' -o "{3}"'.format(ZabS,HOST,acc,output)
-	                	print(command)
-        	        	pipe = os.popen(command)
+        	        	pipe = os.popen('zabbix_sender -z {0} -s {1} -k \'host_[{2}]\' -o "{3}"'.format(ZabS,HOST,acc,output))
 			else:
-				command = 'zabbix_sender -z {0} -s {1} -k \'host_[{2}]\' -o "No ping"'.format(ZabS,HOST,acc)
-                                print(command)
-                                pipe = os.popen(command)
+                                pipe = os.popen('zabbix_sender -z {0} -s {1} -k \'host_[{2}]\' -o "No ping"'.format(ZabS,HOST,acc))
 	except Error as e:
 	        print(e)
 
-SQL_output = connect()
-
-create_items()
-time.sleep(30)
-main()
+if __name__ == '__main__':
+	SQL_output = connect()
+	create_items()
+	time.sleep(30)
+	main()
